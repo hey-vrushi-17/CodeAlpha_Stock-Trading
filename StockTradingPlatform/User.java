@@ -1,8 +1,7 @@
 // ============================================================
-//  User.java  –  UPDATED Phase 5 & 6
-//  • buyStock/sellStock: record snapshots + use updated Transaction
-//  • viewPortfolio: full breakdown with avg price, unrealized P/L
-//  • transactionHistory: latest-first, filter by type, detail view
+//  User.java  –  UPDATED Phase 7
+//  Auto-saves to files after every buy/sell operation.
+//  Loads saved portfolio, balance, and history on creation.
 // ============================================================
 
 import java.util.ArrayList;
@@ -10,7 +9,6 @@ import java.util.Scanner;
 
 public class User implements Trading {
 
-    // ── Private fields ───────────────────────────────────────
     private String    name;
     private String    email;
     private double    balance;
@@ -20,7 +18,7 @@ public class User implements Trading {
     private ArrayList<Stock> marketStocks;
     private Scanner          scanner;
 
-    // ── Constructor ──────────────────────────────────────────
+    // ── Constructor (creates fresh user) ──────────────────────
     public User(String name, String email,
                 ArrayList<Stock> marketStocks, Scanner scanner) {
         this.name         = name;
@@ -32,20 +30,38 @@ public class User implements Trading {
         this.scanner      = scanner;
     }
 
+    // ── Phase 7: Load saved data into this user ───────────────
+    public void loadSavedData() {
+        // Load balance
+        this.balance = DataManager.loadBalance(name);
+
+        // Load portfolio holdings
+        DataManager.loadPortfolio(name, portfolio);
+
+        // Load transaction history
+        ArrayList<Transaction> saved = DataManager.loadTransactions(name);
+        this.history.addAll(saved);
+
+        if (!saved.isEmpty()) {
+            System.out.printf("  [LOADED] %d transactions, Balance: Rs. %.2f, " +
+                    "%d stock type(s) restored.%n",
+                    saved.size(), balance, portfolio.countDistinctHoldings());
+        }
+    }
+
     // ── Getters ──────────────────────────────────────────────
     public String    getName()      { return name; }
     public String    getEmail()     { return email; }
     public double    getBalance()   { return balance; }
     public Portfolio getPortfolio() { return portfolio; }
 
-    // ── Helper: find stock ───────────────────────────────────
     private Stock findStock(String symbol) {
         for (Stock s : marketStocks)
             if (s.getSymbol().equalsIgnoreCase(symbol)) return s;
         return null;
     }
 
-    // ── Personalized Dashboard ────────────────────────────────
+    // ── Dashboard ─────────────────────────────────────────────
     public void showDashboard() {
         double stockVal = portfolio.getTotalStockValue(marketStocks);
         double invested = portfolio.getTotalInvestment(marketStocks);
@@ -67,7 +83,7 @@ public class User implements Trading {
     }
 
     // ============================================================
-    //  1. buyStock()  –  implements Trading
+    //  1. buyStock()  –  with auto-save (Phase 7)
     // ============================================================
     @Override
     public void buyStock() {
@@ -97,7 +113,7 @@ public class User implements Trading {
 
         double totalCost = stock.getPrice() * qty;
 
-        // ── Confirmation ──────────────────────────────────────
+        // Confirmation
         System.out.println("\n  ┌─────────────────────────────────────┐");
         System.out.println("  │          PURCHASE CONFIRMATION       │");
         System.out.println("  ├─────────────────────────────────────┤");
@@ -115,24 +131,25 @@ public class User implements Trading {
             return;
         }
 
-        // ── Validate & execute ────────────────────────────────
         try {
             if (totalCost > balance)
                 throw new InsufficientBalanceException(totalCost, balance);
 
             balance -= totalCost;
             portfolio.addHolding(sym, qty, totalCost);
-            history.add(new Transaction("BUY", sym, stock.getCompanyName(),
-                            qty, stock.getPrice(), totalCost, 0.0));
+            Transaction txn = new Transaction("BUY", sym, stock.getCompanyName(),
+                            qty, stock.getPrice(), totalCost, 0.0);
+            history.add(txn);
+            portfolio.takeSnapshot(balance, marketStocks, "BUY " + sym + " x" + qty);
 
-            // Phase 5: take snapshot after trade
-            portfolio.takeSnapshot(balance, marketStocks,
-                    "BUY " + sym + " x" + qty);
+            // ── Phase 7: Auto-save to files ───────────────────
+            DataManager.saveAll(name, balance, portfolio, txn);
 
             System.out.println("\n  ✔ Purchase Successful!");
             System.out.printf("  Bought  : %d share(s) of %s%n", qty, sym);
             System.out.printf("  Paid    : Rs. %.2f%n", totalCost);
             System.out.printf("  Balance : Rs. %.2f%n", balance);
+            System.out.println("  [SAVED] Data saved to disk automatically.");
 
         } catch (InsufficientBalanceException e) {
             System.out.println("\n  [ERROR] " + e.getMessage());
@@ -142,13 +159,12 @@ public class User implements Trading {
     }
 
     // ============================================================
-    //  2. sellStock()  –  implements Trading
+    //  2. sellStock()  –  with auto-save (Phase 7)
     // ============================================================
     @Override
     public void sellStock() {
         System.out.println("\n  ─── 📉 SELL STOCKS ───");
         portfolio.displayHoldings(marketStocks);
-
         if (portfolio.countDistinctHoldings() == 0) return;
 
         System.out.print("  Enter Stock Symbol to SELL : ");
@@ -178,7 +194,7 @@ public class User implements Trading {
             double profitOrLoss = saleAmount - costPortion;
             String plArrow      = profitOrLoss >= 0 ? "▲ PROFIT" : "▼ LOSS";
 
-            // ── Confirmation with P&L preview ─────────────────
+            // Confirmation
             System.out.println("\n  ┌─────────────────────────────────────┐");
             System.out.println("  │            SELL CONFIRMATION         │");
             System.out.println("  ├─────────────────────────────────────┤");
@@ -199,12 +215,13 @@ public class User implements Trading {
 
             balance += saleAmount;
             portfolio.removeHolding(sym, qty, costPortion);
-            history.add(new Transaction("SELL", sym, stock.getCompanyName(),
-                            qty, stock.getPrice(), saleAmount, profitOrLoss));
+            Transaction txn = new Transaction("SELL", sym, stock.getCompanyName(),
+                            qty, stock.getPrice(), saleAmount, profitOrLoss);
+            history.add(txn);
+            portfolio.takeSnapshot(balance, marketStocks, "SELL " + sym + " x" + qty);
 
-            // Phase 5: take snapshot after trade
-            portfolio.takeSnapshot(balance, marketStocks,
-                    "SELL " + sym + " x" + qty);
+            // ── Phase 7: Auto-save to files ───────────────────
+            DataManager.saveAll(name, balance, portfolio, txn);
 
             System.out.println("\n  ✔ Sale Successful!");
             System.out.printf("  Sold    : %d share(s) of %s%n", qty, sym);
@@ -212,6 +229,7 @@ public class User implements Trading {
             System.out.printf("  P / L   : Rs. %.2f  %s%n",
                     Math.abs(profitOrLoss), plArrow);
             System.out.printf("  Balance : Rs. %.2f%n", balance);
+            System.out.println("  [SAVED] Data saved to disk automatically.");
 
         } catch (InsufficientStocksException | IllegalArgumentException e) {
             System.out.println("\n  [ERROR] " + e.getMessage());
@@ -219,7 +237,7 @@ public class User implements Trading {
     }
 
     // ============================================================
-    //  3. viewPortfolio()  –  implements Trading  (Phase 5 enhanced)
+    //  3. viewPortfolio()
     // ============================================================
     @Override
     public void viewPortfolio() {
@@ -234,7 +252,6 @@ public class User implements Trading {
         System.out.println("  ══════════════════════════════════════════════════════════════");
         System.out.printf( "  Trader : %s   |   Email : %s%n", name, email);
         System.out.println("  " + "─".repeat(62));
-
         System.out.printf( "  %-8s %-20s %-6s %-12s %-12s %-12s %-10s%n",
                 "SYMBOL","COMPANY","QTY","AVG.PRICE","INVESTED","CURR.VALUE","UNREAL.P/L");
         System.out.println("  " + "─".repeat(85));
@@ -267,8 +284,7 @@ public class User implements Trading {
     }
 
     // ============================================================
-    //  4. transactionHistory()  –  implements Trading  (Phase 6)
-    //     Shows latest transactions first with IDs and details.
+    //  4. transactionHistory()
     // ============================================================
     @Override
     public void transactionHistory() {
@@ -276,78 +292,49 @@ public class User implements Trading {
         System.out.println("                              📋  TRANSACTION HISTORY (Latest First)");
         System.out.println("  ══════════════════════════════════════════════════════════════════════════════════════════");
         if (history.isEmpty()) {
-            System.out.println("  No transactions yet. Start trading!");
+            System.out.println("  No transactions yet.");
         } else {
             System.out.printf("  %-7s %-21s %-5s %-7s %-22s %-5s %-11s %-11s %-10s%n",
                     "TXN#","TIMESTAMP","TYPE","SYMBOL","COMPANY","QTY","PRICE/SHR","TOTAL","P/L");
             System.out.println("  " + "─".repeat(105));
-
-            // Phase 6: Display latest first
-            for (int i = history.size() - 1; i >= 0; i--) {
-                history.get(i).display();
-            }
+            for (int i = history.size() - 1; i >= 0; i--) history.get(i).display();
             System.out.println("  " + "─".repeat(105));
 
-            // Summary statistics
-            int buys = 0, sells = 0;
-            double totalBought = 0, totalSold = 0, totalPL = 0;
+            int buys=0, sells=0; double totalBought=0, totalSold=0, totalPL=0;
             for (Transaction t : history) {
-                if (t.getType().equals("BUY")) {
-                    buys++;
-                    totalBought += t.getAmount();
-                } else {
-                    sells++;
-                    totalSold += t.getAmount();
-                    totalPL   += t.getProfitLoss();
-                }
+                if (t.getType().equals("BUY")) { buys++; totalBought += t.getAmount(); }
+                else { sells++; totalSold += t.getAmount(); totalPL += t.getProfitLoss(); }
             }
-            System.out.printf("  Total: %d transactions  |  Buys: %d (Rs. %.2f)  |  Sells: %d (Rs. %.2f)%n",
+            System.out.printf("  Total: %d  |  Buys: %d (Rs. %.2f)  |  Sells: %d (Rs. %.2f)%n",
                     history.size(), buys, totalBought, sells, totalSold);
-            if (sells > 0) {
-                String plArr = totalPL >= 0 ? "▲ PROFIT" : "▼ LOSS";
-                System.out.printf("  Realized P/L from all sells: Rs. %.2f  %s%n",
-                        Math.abs(totalPL), plArr);
-            }
+            if (sells > 0)
+                System.out.printf("  Realized P/L: Rs. %.2f  %s%n",
+                        Math.abs(totalPL), totalPL >= 0 ? "▲ PROFIT" : "▼ LOSS");
         }
         System.out.println("  ══════════════════════════════════════════════════════════════════════════════════════════");
     }
 
-    // ── Phase 6: View details of a single transaction ─────────
     public void viewTransactionDetail() {
-        if (history.isEmpty()) {
-            System.out.println("  No transactions to view.");
-            return;
-        }
+        if (history.isEmpty()) { System.out.println("  No transactions."); return; }
         System.out.print("  Enter Transaction ID (e.g. 1001) : ");
         int id = readInt();
-        for (Transaction t : history) {
-            if (t.getTransactionId() == id) {
-                t.displayDetailed();
-                return;
-            }
-        }
+        for (Transaction t : history)
+            if (t.getTransactionId() == id) { t.displayDetailed(); return; }
         System.out.println("  [ERROR] Transaction #" + id + " not found.");
     }
 
-    // ── Phase 6: Filter history by type ───────────────────────
     public void filterHistory(String type) {
         System.out.printf("\n  ─── Showing %s transactions only ───%n", type);
         boolean found = false;
-        for (int i = history.size() - 1; i >= 0; i--) {
-            if (history.get(i).getType().equals(type)) {
-                history.get(i).display();
-                found = true;
-            }
-        }
+        for (int i = history.size()-1; i >= 0; i--)
+            if (history.get(i).getType().equals(type)) { history.get(i).display(); found = true; }
         if (!found) System.out.println("  No " + type + " transactions yet.");
     }
 
-    // ── Phase 5: Show portfolio performance snapshots ─────────
     public void showPerformanceHistory() {
         portfolio.displayPerformanceHistory();
     }
 
-    // ── Safe int reader ──────────────────────────────────────
     private int readInt() {
         try { return scanner.nextInt(); }
         catch (Exception e) { scanner.nextLine(); return -1; }

@@ -1,7 +1,8 @@
 // ============================================================
-//  Main.java  –  UPDATED Phase 5 & 6
-//  Portfolio submenu (view, performance) + History submenu
-//  (all, filter BUY/SELL, detail by ID). All prev phases intact.
+//  Main.java  –  UPDATED Phase 7
+//  • Calls DataManager.initDataDirectory() on startup
+//  • Loads saved users via auth.loadFromFile()
+//  • All previous menus intact (Market, Portfolio, History)
 // ============================================================
 
 import java.util.ArrayList;
@@ -13,6 +14,9 @@ public class Main {
 
     public static void main(String[] args) {
 
+        // ── Phase 7: Initialize data directory ────────────────
+        DataManager.initDataDirectory();
+
         // ── 1. Build StockMarket ──────────────────────────────
         StockMarket stockMarket = new StockMarket();
         ArrayList<Stock> market = stockMarket.getStockList();
@@ -20,8 +24,14 @@ public class Main {
         // ── 2. Auth System ────────────────────────────────────
         AuthSystem auth = new AuthSystem(market);
 
-        // ── 3. Welcome ───────────────────────────────────────
+        // ── Phase 7: Load saved users from files ──────────────
+        int loaded = auth.loadFromFile(sc);
+
+        // ── 3. Welcome ────────────────────────────────────────
         printWelcomeBanner();
+        if (loaded > 0) {
+            System.out.printf("  [LOADED] %d saved user account(s) restored from disk.%n%n", loaded);
+        }
 
         // ── 4. Auth loop ──────────────────────────────────────
         User loggedInUser = null;
@@ -78,22 +88,21 @@ public class Main {
             System.out.println();
 
             switch (choice) {
-                case 1: marketDataMenu(stockMarket);             break;
-                case 2: loggedInUser.buyStock();                 break;
-                case 3: loggedInUser.sellStock();                break;
-                case 4: portfolioMenu(loggedInUser);             break;  // Phase 5 submenu
-                case 5: historyMenu(loggedInUser);               break;  // Phase 6 submenu
+                case 1: marketDataMenu(stockMarket);       break;
+                case 2: loggedInUser.buyStock();           break;
+                case 3: loggedInUser.sellStock();          break;
+                case 4: portfolioMenu(loggedInUser);       break;
+                case 5: historyMenu(loggedInUser);         break;
                 case 6:
                     System.out.printf("  Available Balance : Rs. %.2f%n",
                             loggedInUser.getBalance());
                     break;
-                case 7: loggedInUser.showDashboard();            break;
+                case 7: loggedInUser.showDashboard();     break;
                 case 8:
-                    System.out.println("  ✔ Logged out. See you, "
+                    System.out.println("  ✔ Logged out. All data is saved. See you, "
                             + loggedInUser.getName() + "!");
                     break;
-                default:
-                    System.out.println("  [ERROR] Enter 1–8.");
+                default: System.out.println("  [ERROR] Enter 1–8.");
             }
             System.out.println();
         } while (choice != 8);
@@ -101,9 +110,7 @@ public class Main {
         sc.close();
     }
 
-    // ============================================================
-    //  Phase 3: Market Data Submenu
-    // ============================================================
+    // ── Market Data Submenu ───────────────────────────────────
     private static void marketDataMenu(StockMarket stockMarket) {
         int sub;
         do {
@@ -116,28 +123,23 @@ public class Main {
             System.out.println("  │  4. Back to Main Menu                  │");
             System.out.println("  └────────────────────────────────────────┘");
             System.out.print("  Your choice : ");
-            sub = readInt();
-            System.out.println();
+            sub = readInt(); System.out.println();
             switch (sub) {
                 case 1: stockMarket.displayAllStocks(); break;
                 case 2:
-                    System.out.print("  Enter Stock Symbol to search : ");
-                    stockMarket.displaySearchResult(sc.next());
-                    break;
+                    System.out.print("  Enter Stock Symbol : ");
+                    stockMarket.displaySearchResult(sc.next()); break;
                 case 3:
-                    System.out.print("  Enter Stock Symbol for details : ");
-                    stockMarket.displayStockDetails(sc.next());
-                    break;
-                case 4: System.out.println("  Returning to main menu..."); break;
+                    System.out.print("  Enter Stock Symbol : ");
+                    stockMarket.displayStockDetails(sc.next()); break;
+                case 4: System.out.println("  Returning..."); break;
                 default: System.out.println("  [ERROR] Enter 1–4.");
             }
             System.out.println();
         } while (sub != 4);
     }
 
-    // ============================================================
-    //  Phase 5: Portfolio Submenu
-    // ============================================================
+    // ── Portfolio Submenu ─────────────────────────────────────
     private static void portfolioMenu(User user) {
         int sub;
         do {
@@ -149,10 +151,9 @@ public class Main {
             System.out.println("  │  3. Back to Main Menu                  │");
             System.out.println("  └────────────────────────────────────────┘");
             System.out.print("  Your choice : ");
-            sub = readInt();
-            System.out.println();
+            sub = readInt(); System.out.println();
             switch (sub) {
-                case 1: user.viewPortfolio();         break;
+                case 1: user.viewPortfolio(); break;
                 case 2: user.showPerformanceHistory(); break;
                 case 3: System.out.println("  Returning..."); break;
                 default: System.out.println("  [ERROR] Enter 1–3.");
@@ -161,9 +162,7 @@ public class Main {
         } while (sub != 3);
     }
 
-    // ============================================================
-    //  Phase 6: Transaction History Submenu
-    // ============================================================
+    // ── Transaction History Submenu ───────────────────────────
     private static void historyMenu(User user) {
         int sub;
         do {
@@ -171,19 +170,18 @@ public class Main {
             System.out.println("  │       📋  TRANSACTION HISTORY MENU     │");
             System.out.println("  ├────────────────────────────────────────┤");
             System.out.println("  │  1. View All Transactions (Latest 1st) │");
-            System.out.println("  │  2. Filter: BUY Transactions Only      │");
-            System.out.println("  │  3. Filter: SELL Transactions Only     │");
+            System.out.println("  │  2. Filter: BUY Only                   │");
+            System.out.println("  │  3. Filter: SELL Only                  │");
             System.out.println("  │  4. View Transaction Details (by ID)   │");
             System.out.println("  │  5. Back to Main Menu                  │");
             System.out.println("  └────────────────────────────────────────┘");
             System.out.print("  Your choice : ");
-            sub = readInt();
-            System.out.println();
+            sub = readInt(); System.out.println();
             switch (sub) {
-                case 1: user.transactionHistory();     break;
-                case 2: user.filterHistory("BUY");     break;
-                case 3: user.filterHistory("SELL");    break;
-                case 4: user.viewTransactionDetail();  break;
+                case 1: user.transactionHistory();    break;
+                case 2: user.filterHistory("BUY");    break;
+                case 3: user.filterHistory("SELL");   break;
+                case 4: user.viewTransactionDetail(); break;
                 case 5: System.out.println("  Returning..."); break;
                 default: System.out.println("  [ERROR] Enter 1–5.");
             }
@@ -195,8 +193,8 @@ public class Main {
 
     private static void printWelcomeBanner() {
         System.out.println("╔══════════════════════════════════════════╗");
-        System.out.println("║      STOCK TRADING PLATFORM  –  v6.0    ║");
-        System.out.println("║    Phase 5+6 : Portfolio & History       ║");
+        System.out.println("║      STOCK TRADING PLATFORM  –  v7.0    ║");
+        System.out.println("║     Phase 7 : Data Storage & Persistence ║");
         System.out.println("╚══════════════════════════════════════════╝");
     }
 

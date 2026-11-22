@@ -1,32 +1,28 @@
 // ============================================================
-//  UserCredentials.java  –  Stores login details (Phase 2)
-//  Encapsulation: all fields private, accessed via getters only.
+//  UserCredentials.java  –  UPDATED Phase 7
+//  Added getPassword() for DataManager to save credentials.
 // ============================================================
 
 public class UserCredentials {
 
-    // ── Private fields (Encapsulation) ───────────────────────
     private String username;
     private String email;
-    private String password;   // stored as plain text (Phase 2 scope)
+    private String password;
 
-    // ── Constructor ──────────────────────────────────────────
     public UserCredentials(String username, String email, String password) {
         this.username = username;
         this.email    = email;
         this.password = password;
     }
 
-    // ── Getters ──────────────────────────────────────────────
     public String getUsername() { return username; }
     public String getEmail()    { return email; }
+    public String getPassword() { return password; }  // Phase 7: for file save
 
-    // ── Password validation (never expose raw password) ──────
     public boolean checkPassword(String input) {
         return this.password.equals(input);
     }
 
-    // ── Display (masks password for security) ────────────────
     public void display() {
         System.out.printf("  Username : %s%n", username);
         System.out.printf("  Email    : %s%n", email);

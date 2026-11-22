@@ -1,7 +1,7 @@
 // ============================================================
-//  Transaction.java  –  UPDATED Phase 6
-//  Added: unique transaction ID, stock company name.
-//  Displays latest-first with full details.
+//  Transaction.java  –  UPDATED Phase 7
+//  Added setters for transactionId and timestamp so
+//  DataManager can restore saved values when loading from file.
 // ============================================================
 
 import java.time.LocalDateTime;
@@ -13,14 +13,14 @@ public class Transaction {
     private static int idCounter = 1000;
 
     // ── Private fields ───────────────────────────────────────
-    private int           transactionId;    // ← NEW Phase 6
-    private String        type;             // "BUY" or "SELL"
+    private int           transactionId;
+    private String        type;
     private String        stockSymbol;
-    private String        stockName;        // ← NEW Phase 6
+    private String        stockName;
     private int           quantity;
     private double        pricePerShare;
     private double        amount;
-    private double        profitLoss;       // 0 for BUY
+    private double        profitLoss;
     private LocalDateTime timestamp;
 
     private static final DateTimeFormatter FMT =
@@ -51,6 +51,20 @@ public class Transaction {
     public double        getAmount()        { return amount; }
     public double        getProfitLoss()    { return profitLoss; }
     public LocalDateTime getTimestamp()     { return timestamp; }
+
+    // ── Phase 7: Setters for restoring saved data ─────────────
+    public void setTransactionId(int id) {
+        this.transactionId = id;
+        // Keep idCounter ahead of loaded IDs
+        if (id > idCounter) idCounter = id;
+    }
+
+    public void setTimestamp(LocalDateTime ts) {
+        this.timestamp = ts;
+    }
+
+    // ── Static: get current counter (for ID continuity) ───────
+    public static int getIdCounter() { return idCounter; }
 
     // ── Short one-line display ────────────────────────────────
     public void display() {
