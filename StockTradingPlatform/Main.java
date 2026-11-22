@@ -1,6 +1,7 @@
 // ============================================================
-//  Main.java  –  Entry point. Menu-driven console application.
-//  Creates the market, registers the user, and shows the menu.
+//  Main.java  –  UPDATED Phase 5 & 6
+//  Portfolio submenu (view, performance) + History submenu
+//  (all, filter BUY/SELL, detail by ID). All prev phases intact.
 // ============================================================
 
 import java.util.ArrayList;
@@ -8,98 +9,226 @@ import java.util.Scanner;
 
 public class Main {
 
+    static Scanner sc = new Scanner(System.in);
+
     public static void main(String[] args) {
 
-        Scanner sc = new Scanner(System.in);
+        // ── 1. Build StockMarket ──────────────────────────────
+        StockMarket stockMarket = new StockMarket();
+        ArrayList<Stock> market = stockMarket.getStockList();
 
-        // ── 1. Build the stock market ─────────────────────────
-        ArrayList<Stock> market = new ArrayList<>();
-        market.add(new Stock("TCS",   "Tata Consultancy Services", 3500.00));
-        market.add(new Stock("INFY",  "Infosys Ltd.",              1800.00));
-        market.add(new Stock("RELI",  "Reliance Industries",       1400.00));
-        market.add(new Stock("HDFC",  "HDFC Bank Ltd.",            1700.00));
-        market.add(new Stock("WIPRO", "Wipro Ltd.",                 600.00));
+        // ── 2. Auth System ────────────────────────────────────
+        AuthSystem auth = new AuthSystem(market);
 
-        // ── 2. Welcome banner ─────────────────────────────────
-        System.out.println("╔══════════════════════════════════════════╗");
-        System.out.println("║      STOCK TRADING PLATFORM  –  v1.0    ║");
-        System.out.println("║           Phase 1 : Foundation          ║");
-        System.out.println("╚══════════════════════════════════════════╝");
+        // ── 3. Welcome ───────────────────────────────────────
+        printWelcomeBanner();
 
-        System.out.print("\n  Enter your name : ");
-        String name = sc.nextLine().trim();
+        // ── 4. Auth loop ──────────────────────────────────────
+        User loggedInUser = null;
 
-        // ── 3. Create user (implements Trading) ───────────────
-        User user = new User(name, market, sc);
+        while (loggedInUser == null) {
+            printAuthMenu();
+            int authChoice = readInt();
+            switch (authChoice) {
+                case 1:
+                    System.out.println("\n  ─── NEW USER REGISTRATION ───");
+                    System.out.print("  Enter Username  : ");
+                    String regUser  = sc.next();
+                    System.out.print("  Enter Email     : ");
+                    String regEmail = sc.next();
+                    System.out.print("  Enter Password  : ");
+                    String regPass  = sc.next();
+                    try {
+                        auth.register(regUser, regEmail, regPass, sc);
+                    } catch (DuplicateUserException | IllegalArgumentException e) {
+                        System.out.println("\n  [ERROR] " + e.getMessage());
+                    }
+                    break;
+                case 2:
+                    System.out.println("\n  ─── USER LOGIN ───");
+                    System.out.print("  Enter Username  : ");
+                    String loginUser = sc.next();
+                    System.out.print("  Enter Password  : ");
+                    String loginPass = sc.next();
+                    try {
+                        loggedInUser = auth.login(loginUser, loginPass);
+                        System.out.println("\n  ✔ Login Successful! Welcome back, "
+                                + loggedInUser.getName() + "!");
+                    } catch (InvalidCredentialsException e) {
+                        System.out.println("\n  [ERROR] " + e.getMessage());
+                    }
+                    break;
+                case 3:
+                    System.out.println("\n  Goodbye! 👋");
+                    sc.close(); return;
+                default:
+                    System.out.println("\n  [ERROR] Enter 1, 2 or 3.");
+            }
+            System.out.println();
+        }
 
-        System.out.println("\n  Welcome, " + name + "!");
-        System.out.printf("  Starting Balance : Rs. %.2f%n%n", user.getBalance());
+        // ── 5. Dashboard ──────────────────────────────────────
+        loggedInUser.showDashboard();
 
-        // ── 4. Main menu loop ─────────────────────────────────
+        // ── 6. Main menu ──────────────────────────────────────
         int choice;
         do {
-            System.out.println("┌──────────────────────────────────────────┐");
-            System.out.println("│               MAIN  MENU                 │");
-            System.out.println("├──────────────────────────────────────────┤");
-            System.out.println("│  1. View Market Data                     │");
-            System.out.println("│  2. Buy  Stock                           │");
-            System.out.println("│  3. Sell Stock                           │");
-            System.out.println("│  4. View Portfolio                       │");
-            System.out.println("│  5. Transaction History                  │");
-            System.out.println("│  6. Check Balance                        │");
-            System.out.println("│  7. Exit                                 │");
-            System.out.println("└──────────────────────────────────────────┘");
-            System.out.print("  Your choice : ");
-
-            choice = sc.nextInt();
-
+            printTradingMenu(loggedInUser.getName());
+            choice = readInt();
             System.out.println();
 
             switch (choice) {
-
-                case 1: // ── View market ───────────────────────
-                    System.out.println("  ─── LIVE MARKET DATA ───");
-                    System.out.printf("  %-8s %-28s %s%n",
-                            "SYMBOL","COMPANY","PRICE");
-                    System.out.println("  " + "-".repeat(50));
-                    for (Stock s : market) s.display();
-                    System.out.println("  " + "-".repeat(50));
-                    break;
-
-                case 2: // ── Buy ───────────────────────────────
-                    user.buyStock();
-                    break;
-
-                case 3: // ── Sell ──────────────────────────────
-                    user.sellStock();
-                    break;
-
-                case 4: // ── Portfolio ─────────────────────────
-                    user.viewPortfolio();
-                    break;
-
-                case 5: // ── History ───────────────────────────
-                    user.transactionHistory();
-                    break;
-
-                case 6: // ── Balance ───────────────────────────
+                case 1: marketDataMenu(stockMarket);             break;
+                case 2: loggedInUser.buyStock();                 break;
+                case 3: loggedInUser.sellStock();                break;
+                case 4: portfolioMenu(loggedInUser);             break;  // Phase 5 submenu
+                case 5: historyMenu(loggedInUser);               break;  // Phase 6 submenu
+                case 6:
                     System.out.printf("  Available Balance : Rs. %.2f%n",
-                            user.getBalance());
+                            loggedInUser.getBalance());
                     break;
-
-                case 7: // ── Exit ──────────────────────────────
-                    System.out.println("  Thank you for using Stock Trading Platform!");
-                    System.out.println("  Goodbye, " + user.getName() + "! 👋");
+                case 7: loggedInUser.showDashboard();            break;
+                case 8:
+                    System.out.println("  ✔ Logged out. See you, "
+                            + loggedInUser.getName() + "!");
                     break;
-
                 default:
-                    System.out.println("  [ERROR] Invalid choice! Enter 1–7.");
+                    System.out.println("  [ERROR] Enter 1–8.");
             }
-
             System.out.println();
-
-        } while (choice != 7);
+        } while (choice != 8);
 
         sc.close();
+    }
+
+    // ============================================================
+    //  Phase 3: Market Data Submenu
+    // ============================================================
+    private static void marketDataMenu(StockMarket stockMarket) {
+        int sub;
+        do {
+            System.out.println("  ┌────────────────────────────────────────┐");
+            System.out.println("  │          📊  MARKET DATA MENU          │");
+            System.out.println("  ├────────────────────────────────────────┤");
+            System.out.println("  │  1. View All Stocks (Table)            │");
+            System.out.println("  │  2. Search Stock by Symbol             │");
+            System.out.println("  │  3. View Individual Stock Details      │");
+            System.out.println("  │  4. Back to Main Menu                  │");
+            System.out.println("  └────────────────────────────────────────┘");
+            System.out.print("  Your choice : ");
+            sub = readInt();
+            System.out.println();
+            switch (sub) {
+                case 1: stockMarket.displayAllStocks(); break;
+                case 2:
+                    System.out.print("  Enter Stock Symbol to search : ");
+                    stockMarket.displaySearchResult(sc.next());
+                    break;
+                case 3:
+                    System.out.print("  Enter Stock Symbol for details : ");
+                    stockMarket.displayStockDetails(sc.next());
+                    break;
+                case 4: System.out.println("  Returning to main menu..."); break;
+                default: System.out.println("  [ERROR] Enter 1–4.");
+            }
+            System.out.println();
+        } while (sub != 4);
+    }
+
+    // ============================================================
+    //  Phase 5: Portfolio Submenu
+    // ============================================================
+    private static void portfolioMenu(User user) {
+        int sub;
+        do {
+            System.out.println("  ┌────────────────────────────────────────┐");
+            System.out.println("  │          📁  PORTFOLIO MENU            │");
+            System.out.println("  ├────────────────────────────────────────┤");
+            System.out.println("  │  1. View Full Portfolio                │");
+            System.out.println("  │  2. View Performance History           │");
+            System.out.println("  │  3. Back to Main Menu                  │");
+            System.out.println("  └────────────────────────────────────────┘");
+            System.out.print("  Your choice : ");
+            sub = readInt();
+            System.out.println();
+            switch (sub) {
+                case 1: user.viewPortfolio();         break;
+                case 2: user.showPerformanceHistory(); break;
+                case 3: System.out.println("  Returning..."); break;
+                default: System.out.println("  [ERROR] Enter 1–3.");
+            }
+            System.out.println();
+        } while (sub != 3);
+    }
+
+    // ============================================================
+    //  Phase 6: Transaction History Submenu
+    // ============================================================
+    private static void historyMenu(User user) {
+        int sub;
+        do {
+            System.out.println("  ┌────────────────────────────────────────┐");
+            System.out.println("  │       📋  TRANSACTION HISTORY MENU     │");
+            System.out.println("  ├────────────────────────────────────────┤");
+            System.out.println("  │  1. View All Transactions (Latest 1st) │");
+            System.out.println("  │  2. Filter: BUY Transactions Only      │");
+            System.out.println("  │  3. Filter: SELL Transactions Only     │");
+            System.out.println("  │  4. View Transaction Details (by ID)   │");
+            System.out.println("  │  5. Back to Main Menu                  │");
+            System.out.println("  └────────────────────────────────────────┘");
+            System.out.print("  Your choice : ");
+            sub = readInt();
+            System.out.println();
+            switch (sub) {
+                case 1: user.transactionHistory();     break;
+                case 2: user.filterHistory("BUY");     break;
+                case 3: user.filterHistory("SELL");    break;
+                case 4: user.viewTransactionDetail();  break;
+                case 5: System.out.println("  Returning..."); break;
+                default: System.out.println("  [ERROR] Enter 1–5.");
+            }
+            System.out.println();
+        } while (sub != 5);
+    }
+
+    // ── Menus ─────────────────────────────────────────────────
+
+    private static void printWelcomeBanner() {
+        System.out.println("╔══════════════════════════════════════════╗");
+        System.out.println("║      STOCK TRADING PLATFORM  –  v6.0    ║");
+        System.out.println("║    Phase 5+6 : Portfolio & History       ║");
+        System.out.println("╚══════════════════════════════════════════╝");
+    }
+
+    private static void printAuthMenu() {
+        System.out.println("┌──────────────────────────────────────────┐");
+        System.out.println("│           AUTHENTICATION MENU            │");
+        System.out.println("├──────────────────────────────────────────┤");
+        System.out.println("│  1. Register New Account                 │");
+        System.out.println("│  2. Login to Existing Account            │");
+        System.out.println("│  3. Exit                                 │");
+        System.out.println("└──────────────────────────────────────────┘");
+        System.out.print("  Your choice : ");
+    }
+
+    private static void printTradingMenu(String name) {
+        System.out.println("┌──────────────────────────────────────────┐");
+        System.out.printf( "│  Logged in as: %-27s│%n", name);
+        System.out.println("├──────────────────────────────────────────┤");
+        System.out.println("│  1. Market Data  (View / Search)         │");
+        System.out.println("│  2. Buy  Stock                           │");
+        System.out.println("│  3. Sell Stock                           │");
+        System.out.println("│  4. Portfolio    (View / Performance)    │");
+        System.out.println("│  5. Transaction History                  │");
+        System.out.println("│  6. Check Balance                        │");
+        System.out.println("│  7. View Dashboard                       │");
+        System.out.println("│  8. Logout                               │");
+        System.out.println("└──────────────────────────────────────────┘");
+        System.out.print("  Your choice : ");
+    }
+
+    private static int readInt() {
+        try { return sc.nextInt(); }
+        catch (Exception e) { sc.nextLine(); return -1; }
     }
 }
