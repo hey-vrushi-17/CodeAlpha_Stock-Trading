@@ -1,7 +1,7 @@
 // ============================================================
-//  User.java  –  UPDATED Phase 7
-//  Auto-saves to files after every buy/sell operation.
-//  Loads saved portfolio, balance, and history on creation.
+//  User.java  –  UPDATED Phase 8
+//  Added executeBuy(), executeSell(), getHistory(), getTransactionCount()
+//  for GUI integration. All console methods still work.
 // ============================================================
 
 import java.util.ArrayList;
@@ -339,4 +339,47 @@ public class User implements Trading {
         try { return scanner.nextInt(); }
         catch (Exception e) { scanner.nextLine(); return -1; }
     }
+
+    // ============================================================
+    //  Phase 8: GUI-facing methods (called by TradingPanel)
+    // ============================================================
+
+    // ── Execute buy (no console I/O, used by GUI) ─────────────
+    public void executeBuy(Stock stock, int qty) throws InsufficientBalanceException {
+        double cost = stock.getPrice() * qty;
+        if (cost > balance) throw new InsufficientBalanceException(cost, balance);
+
+        balance -= cost;
+        portfolio.addHolding(stock.getSymbol(), qty, cost);
+        Transaction txn = new Transaction("BUY", stock.getSymbol(),
+                stock.getCompanyName(), qty, stock.getPrice(), cost, 0.0);
+        history.add(txn);
+        portfolio.takeSnapshot(balance, marketStocks,
+                "BUY " + stock.getSymbol() + " x" + qty);
+        DataManager.saveAll(name, balance, portfolio, txn);
+    }
+
+    // ── Execute sell (no console I/O, used by GUI) ────────────
+    public void executeSell(Stock stock, int qty) throws InsufficientStocksException {
+        int owned = portfolio.getQuantity(stock.getSymbol());
+        if (qty > owned) throw new InsufficientStocksException(stock.getSymbol(), qty, owned);
+
+        double avg = portfolio.getAverageBuyPrice(stock.getSymbol());
+        double costPortion  = avg * qty;
+        double saleAmount   = stock.getPrice() * qty;
+        double profitOrLoss = saleAmount - costPortion;
+
+        balance += saleAmount;
+        portfolio.removeHolding(stock.getSymbol(), qty, costPortion);
+        Transaction txn = new Transaction("SELL", stock.getSymbol(),
+                stock.getCompanyName(), qty, stock.getPrice(), saleAmount, profitOrLoss);
+        history.add(txn);
+        portfolio.takeSnapshot(balance, marketStocks,
+                "SELL " + stock.getSymbol() + " x" + qty);
+        DataManager.saveAll(name, balance, portfolio, txn);
+    }
+
+    // ── Getters for GUI ───────────────────────────────────────
+    public ArrayList<Transaction> getHistory() { return history; }
+    public int getTransactionCount() { return history.size(); }
 }
