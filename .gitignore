@@ -1,0 +1,24 @@
+# Compiled Java class files
+*.class
+
+# Package files
+*.jar
+
+# Build output
+out/
+bin/
+build/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+*.project
+*.classpath
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Scripts
+generate_banner.py
